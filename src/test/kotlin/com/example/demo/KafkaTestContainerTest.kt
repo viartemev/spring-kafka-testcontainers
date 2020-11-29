@@ -38,7 +38,7 @@ class KafkaTestContainerTest {
 
     @Autowired
     private lateinit var listener: Listener
-    
+        
     @Test
     fun sendAndReceiveTest() {
         ContainerTestUtils.waitForAssignment(container, 1)
