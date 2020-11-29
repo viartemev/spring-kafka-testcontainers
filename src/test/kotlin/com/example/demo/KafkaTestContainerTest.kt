@@ -11,8 +11,8 @@ import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.Import
-import org.springframework.kafka.core.KafkaAdmin
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.listener.KafkaMessageListenerContainer
 import org.springframework.kafka.test.utils.ContainerTestUtils
@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(SpringRunner::class)
 @SpringBootTest
-@DirtiesContext
-@Import(KafkaTestContainerTest.KafkaTestContainersConfiguration::class, TestListener::class)
+@ComponentScan(basePackageClasses = [Listener::class])
+@Import(KafkaTestContainerTest.KafkaTestContainersConfiguration::class, TestListenerContainer::class)
 @ContextConfiguration(initializers = [KafkaInitializer::class], classes = [KafkaAutoConfiguration::class, KafkaConfig::class])
 class KafkaTestContainerTest {
 
@@ -34,23 +34,17 @@ class KafkaTestContainerTest {
     private lateinit var kafkaTemplate: KafkaTemplate<String, String>
 
     @Autowired
-    private lateinit var kafkaAdmin: KafkaAdmin
-
-    @Autowired
-    private lateinit var kafkaConfig: KafkaConfig
-
-    @Autowired
     private lateinit var container: KafkaMessageListenerContainer<Int, String>
 
-    @BeforeAll
-    fun before() {
-        ContainerTestUtils.waitForAssignment(container, 1)
-    }
-
+    @Autowired
+    private lateinit var listener: Listener
+    
     @Test
     fun sendAndReceiveTest() {
+        ContainerTestUtils.waitForAssignment(container, 1)
+
         Assertions.assertThat(kafkaTemplate).isNotNull
-        kafkaTemplate.send("test-topic-1", "flight of a dragon")
+        kafkaTemplate.send("test-topic-1", "boom")
                 .addCallback(object : ListenableFutureCallback<Any> {
                     override fun onSuccess(result: Any?) {
                         println("Success: $result")
@@ -60,13 +54,11 @@ class KafkaTestContainerTest {
                         println("Failure: $ex")
                     }
                 })
-        // Wait
         Awaitility.await()
-                .atMost(30, TimeUnit.MINUTES)
-                .until { kafkaConfig.invocations.size > 0 }
-        // Assert
-        Assertions.assertThat(kafkaConfig.invocations).hasSize(1)
-                .contains("flight of a dragon")
+                .atMost(30, TimeUnit.SECONDS)
+                .until { listener.invocations.size > 0 }
+        Assertions.assertThat(listener.invocations).hasSize(1)
+                .contains("boom")
     }
 
     @TestConfiguration
